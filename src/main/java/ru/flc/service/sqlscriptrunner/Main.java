@@ -1,5 +1,8 @@
 package ru.flc.service.sqlscriptrunner;
 
+import org.dav.service.filesystem.FileSystem;
+import org.dav.service.log.LogUtil;
+import ru.flc.service.sqlscriptrunner.view.RunnerConstants;
 import ru.flc.service.sqlscriptrunner.view.MainFrame;
 
 import javax.swing.*;
@@ -16,7 +19,7 @@ public class Main
 
 	private static void setLogger()
 	{
-		LogUtil.setLogger(FileSystem.getCurrentDir(Main.class), Constants.MESS_LOGGING_PROPERTIES_FILE_NAME);
+		LogUtil.setLogger(FileSystem.getCurrentDir(Main.class), RunnerConstants.MESS_LOGGING_PROPERTIES_FILE_NAME);
 	}
 
 	private static void setLookAndFeel()

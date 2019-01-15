@@ -1,39 +1,62 @@
 package ru.flc.service.sqlscriptrunner.view;
 
+import org.dav.service.util.ResourceManager;
+import org.dav.service.view.TitleAdjuster;
+import ru.flc.service.sqlscriptrunner.RunnerResourceManager;
+
 import javax.swing.*;
 
 public class MainFrame extends JFrame
 {
-	private ActionsManager actionsManager;
+	private ResourceManager resourceManager;
+	private TitleAdjuster titleAdjuster;
 
-	private JMenuBar menuBar;
-	private JMenu fileMenu;
-	private JMenu helpMenu;
-
-
+	private AbstractAction openFileAction;
+	private AbstractAction executeAction;
+	private AbstractAction closeAction;
+	private AbstractAction aboutAction;
+	private AbstractAction exitAction;
 
 	public MainFrame()
 	{
-		initMainMenu();
-		initTextArea();
-		initResultTabs();
+		resourceManager = RunnerResourceManager.getInstance();
+
+		loadAllSettings();
+		loadComponents();
 	}
 
-	private void initMainMenu()
-	{
-		menuBar = new JMenuBar();
-		setJMenuBar(menuBar);
-
-		fileMenu = new JMenu();
-
-	}
-
-	private void initTextArea()
+	private void loadAllSettings()
 	{
 
+
 	}
 
-	private void initResultTabs()
+	private void loadComponents()
+	{
+		titleAdjuster = new TitleAdjuster();
+
+		initActions();
+		initToolBar();
+		initScriptArea();
+		initResultArea();
+	}
+
+	private void initActions()
+	{
+
+	}
+
+	private void initToolBar()
+	{
+
+	}
+
+	private void initScriptArea()
+	{
+
+	}
+
+	private void initResultArea()
 	{
 
 	}
