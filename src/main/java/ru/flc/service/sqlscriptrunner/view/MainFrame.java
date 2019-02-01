@@ -1,15 +1,20 @@
 package ru.flc.service.sqlscriptrunner.view;
 
+import org.dav.service.settings.DatabaseSettings;
+import org.dav.service.settings.TransmissiveSettings;
 import org.dav.service.util.ResourceManager;
 import org.dav.service.view.Title;
 import org.dav.service.view.TitleAdjuster;
+import org.dav.service.view.ViewUtils;
+import org.dav.service.view.dialog.SettingsDialog;
+import org.dav.service.view.dialog.SettingsDialogInvoker;
 import ru.flc.service.sqlscriptrunner.RunnerResourceManager;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.ActionEvent;
 
-public class MainFrame extends JFrame
+public class MainFrame extends JFrame implements SettingsDialogInvoker
 {
 	private static final Dimension PANE_MIN_SIZE = new Dimension(200, 100);
 	private static final Dimension MAIN_WIN_MIN_SIZE = new Dimension(200, 300);
@@ -29,9 +34,13 @@ public class MainFrame extends JFrame
 	private AbstractAction helpAction;
 	private AbstractAction settingsAction;
 
+	private DatabaseSettings dbSettings;
+	private SettingsDialog settingsDialog;
+
 	public MainFrame()
 	{
 		resourceManager = RunnerResourceManager.getInstance();
+		ViewUtils.resetResourceManager(resourceManager);
 
 		loadAllSettings();
 		loadComponents();
@@ -39,8 +48,20 @@ public class MainFrame extends JFrame
 
 	private void loadAllSettings()
 	{
+		loadDatabaseSettings();
+	}
 
-
+	private void loadDatabaseSettings()
+	{
+		try
+		{
+			dbSettings = new DatabaseSettings(resourceManager);
+			dbSettings.load();
+		}
+		catch (Exception e)
+		{
+			log(e);
+		}
 	}
 
 	private void loadComponents()
@@ -97,8 +118,7 @@ public class MainFrame extends JFrame
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
-				JOptionPane.showMessageDialog(MainFrame.this,
-						"Show settings.", "Message", JOptionPane.INFORMATION_MESSAGE);
+				showSettings();
 			}
 		};
 
@@ -191,5 +211,44 @@ public class MainFrame extends JFrame
 	{
 		JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scriptPane, resultPane);
 		add(splitPane, BorderLayout.CENTER);
+	}
+
+	private void showSettings()
+	{
+		if (settingsDialog == null)
+		{
+			TransmissiveSettings[] settingsArray = new TransmissiveSettings[]{dbSettings};
+
+			try
+			{
+				settingsDialog = new SettingsDialog(this, this, resourceManager, settingsArray);
+				settingsDialog.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+			}
+			catch (Exception e)
+			{
+				log(e);
+			}
+		}
+
+		if (settingsDialog != null)
+			settingsDialog.setVisible(true);
+	}
+
+	@Override
+	public void log(Exception e)
+	{
+
+	}
+
+	@Override
+	public void setFocus()
+	{
+
+	}
+
+	@Override
+	public void reloadSettings()
+	{
+
 	}
 }
