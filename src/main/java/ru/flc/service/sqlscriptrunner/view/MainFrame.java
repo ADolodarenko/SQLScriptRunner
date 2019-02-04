@@ -2,6 +2,7 @@ package ru.flc.service.sqlscriptrunner.view;
 
 import org.dav.service.settings.DatabaseSettings;
 import org.dav.service.settings.TransmissiveSettings;
+import org.dav.service.settings.ViewSettings;
 import org.dav.service.util.ResourceManager;
 import org.dav.service.view.Title;
 import org.dav.service.view.TitleAdjuster;
@@ -9,6 +10,7 @@ import org.dav.service.view.ViewUtils;
 import org.dav.service.view.dialog.SettingsDialog;
 import org.dav.service.view.dialog.SettingsDialogInvoker;
 import ru.flc.service.sqlscriptrunner.RunnerResourceManager;
+import ru.flc.service.sqlscriptrunner.model.ApplicationState;
 
 import javax.swing.*;
 import java.awt.*;
@@ -17,6 +19,8 @@ import java.awt.event.ActionEvent;
 public class MainFrame extends JFrame implements SettingsDialogInvoker
 {
 	private static final Dimension PANE_MIN_SIZE = new Dimension(200, 100);
+
+	private static final Dimension MAIN_WIN_PREF_SIZE = new Dimension(600, 400);
 	private static final Dimension MAIN_WIN_MIN_SIZE = new Dimension(200, 300);
 
 	private ResourceManager resourceManager;
@@ -25,8 +29,8 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 	private JTextArea scriptArea;
 	private JScrollPane scriptPane;
 
-	private JTable resultTable;
-	private JScrollPane resultPane;
+	private JTable logTable;
+	private JScrollPane logPane;
 
 	private AbstractAction openFileAction;
 	private AbstractAction runAction;
@@ -35,7 +39,10 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 	private AbstractAction settingsAction;
 
 	private DatabaseSettings dbSettings;
+	private ViewSettings viewSettings;
 	private SettingsDialog settingsDialog;
+
+	private ApplicationState currentState;
 
 	public MainFrame()
 	{
@@ -44,11 +51,14 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 
 		loadAllSettings();
 		loadComponents();
+
+		setApplicationState(ApplicationState.READY);
 	}
 
 	private void loadAllSettings()
 	{
 		loadDatabaseSettings();
+		loadViewSettings();
 	}
 
 	private void loadDatabaseSettings()
@@ -64,6 +74,19 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 		}
 	}
 
+	private void loadViewSettings()
+	{
+		try
+		{
+			viewSettings = new ViewSettings(resourceManager, MAIN_WIN_PREF_SIZE);
+			viewSettings.load();
+		}
+		catch (Exception e)
+		{
+			log(e);
+		}
+	}
+
 	private void loadComponents()
 	{
 		titleAdjuster = new TitleAdjuster();
@@ -71,7 +94,7 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 		initActions();
 		initToolBar();
 		initScriptArea();
-		initResultTable();
+		initLogTable();
 		initSplitter();
 		initFrame();
 
@@ -109,8 +132,7 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
-				JOptionPane.showMessageDialog(MainFrame.this,
-						"Close the script.", "Message", JOptionPane.INFORMATION_MESSAGE);
+				closeScript();
 			}
 		};
 
@@ -197,20 +219,75 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 		scriptPane.setMinimumSize(PANE_MIN_SIZE);
 	}
 
-	private void initResultTable()
+	private void initLogTable()
 	{
-		resultTable = new JTable();
+		logTable = new JTable();
 
-		resultPane = new JScrollPane(resultTable);
-		resultPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
-		resultPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
-		resultPane.setMinimumSize(PANE_MIN_SIZE);
+		logPane = new JScrollPane(logTable);
+		logPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
+		logPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+		logPane.setMinimumSize(PANE_MIN_SIZE);
 	}
 
 	private void initSplitter()
 	{
-		JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scriptPane, resultPane);
+		JSplitPane splitPane = new JSplitPane(JSplitPane.VERTICAL_SPLIT, scriptPane, logPane);
 		add(splitPane, BorderLayout.CENTER);
+	}
+
+	private void openScript()
+	{
+		if (checkApplicationStates(ApplicationState.READY, ApplicationState.SCRIPT_LOADED))
+		{
+			//TODO: Open a script here.
+
+			setApplicationState(ApplicationState.SCRIPT_LOADING);
+		}
+	}
+
+	private void runScript()
+	{
+		if (checkApplicationStates(ApplicationState.SCRIPT_LOADED))
+		{
+			//TODO: Run the script here
+
+			setApplicationState(ApplicationState.SCRIPT_RUNNING);
+		}
+	}
+
+	private void closeScript()
+	{
+		if (checkApplicationStates(ApplicationState.SCRIPT_LOADING, ApplicationState.SCRIPT_LOADED))
+		{
+			clearScriptArea();
+			clearLogTable();
+
+			setApplicationState(ApplicationState.READY);
+		}
+	}
+
+	private void clearScriptArea()
+	{
+		scriptArea.setText(null);
+	}
+
+	private void clearLogTable()
+	{
+		//TODO: clear the log table here
+	}
+
+	private void setApplicationState(ApplicationState desirableState)
+	{
+		currentState = desirableState;
+	}
+
+	private boolean checkApplicationStates(ApplicationState... desirableStates)
+	{
+		for (ApplicationState status : desirableStates)
+			if (status == currentState)
+				return true;
+
+		return false;
 	}
 
 	private void showSettings()
