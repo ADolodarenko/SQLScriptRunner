@@ -11,17 +11,24 @@ import org.dav.service.view.dialog.SettingsDialog;
 import org.dav.service.view.dialog.SettingsDialogInvoker;
 import ru.flc.service.sqlscriptrunner.RunnerResourceManager;
 import ru.flc.service.sqlscriptrunner.model.ApplicationState;
+import ru.flc.service.sqlscriptrunner.model.logic.ScriptLoader;
 
 import javax.swing.*;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
 import java.awt.event.ActionEvent;
+import java.beans.PropertyChangeEvent;
+import java.io.File;
+import java.util.LinkedList;
+import java.util.List;
 
-public class MainFrame extends JFrame implements SettingsDialogInvoker
+public class MainFrame extends JFrame implements ResultView, SettingsDialogInvoker
 {
 	private static final Dimension PANE_MIN_SIZE = new Dimension(200, 100);
-
 	private static final Dimension MAIN_WIN_PREF_SIZE = new Dimension(600, 400);
 	private static final Dimension MAIN_WIN_MIN_SIZE = new Dimension(200, 300);
+
+	private static final String newLineChar = "\n";
 
 	private ResourceManager resourceManager;
 	private TitleAdjuster titleAdjuster;
@@ -40,9 +47,14 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 
 	private DatabaseSettings dbSettings;
 	private ViewSettings viewSettings;
+
 	private SettingsDialog settingsDialog;
+	private AboutDialog aboutDialog;
 
 	private ApplicationState currentState;
+
+	private ScriptLoader scriptLoader;
+	private List<String> scriptLines;
 
 	public MainFrame()
 	{
@@ -114,8 +126,7 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
-				JOptionPane.showMessageDialog(MainFrame.this,
-						"Open a script.", "Message", JOptionPane.INFORMATION_MESSAGE);
+				openScript();
 			}
 		};
 
@@ -148,8 +159,7 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
-				JOptionPane.showMessageDialog(MainFrame.this,
-						"Show info about the program.", "Message", JOptionPane.INFORMATION_MESSAGE);
+				showAboutInfo();
 			}
 		};
 
@@ -213,10 +223,18 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 		scriptArea = new JTextArea();
 		scriptArea.setEditable(false);
 
+		Font font = new Font(Font.MONOSPACED, Font.PLAIN, 14);
+		scriptArea.setFont(font);
+		scriptArea.setLineWrap(true);
+		scriptArea.setWrapStyleWord(true);
+
+		TextLineNumber lineNumber = new TextLineNumber(scriptArea);
+
 		scriptPane = new JScrollPane(scriptArea);
 		scriptPane.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_AS_NEEDED);
 		scriptPane.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
 		scriptPane.setMinimumSize(PANE_MIN_SIZE);
+		scriptPane.setRowHeaderView(lineNumber);
 	}
 
 	private void initLogTable()
@@ -239,9 +257,17 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 	{
 		if (checkApplicationStates(ApplicationState.READY, ApplicationState.SCRIPT_LOADED))
 		{
-			//TODO: Open a script here.
+			JFileChooser fileChooser = ViewUtils.getFileChooser(new File("."));
+			fileChooser.resetChoosableFileFilters();
+			fileChooser.addChoosableFileFilter(new FileNameExtensionFilter("SQL", "SQL"));
 
-			setApplicationState(ApplicationState.SCRIPT_LOADING);
+			if (fileChooser.showOpenDialog(ViewUtils.getDialogOwner()) == JFileChooser.APPROVE_OPTION)
+			{
+				scriptLoader = new ScriptLoader(fileChooser.getSelectedFile(), this);
+				scriptLoader.getPropertyChangeSupport().addPropertyChangeListener("state",
+						evt -> doForWorkerEvent(scriptLoader, evt));
+				scriptLoader.execute();
+			}
 		}
 	}
 
@@ -259,11 +285,30 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 	{
 		if (checkApplicationStates(ApplicationState.SCRIPT_LOADING, ApplicationState.SCRIPT_LOADED))
 		{
-			clearScriptArea();
+			clearData();
 			clearLogTable();
 
 			setApplicationState(ApplicationState.READY);
 		}
+	}
+
+	private void showAboutInfo()
+	{
+		if (aboutDialog == null)
+		{
+			try
+			{
+				aboutDialog = new AboutDialog(this, resourceManager);
+				aboutDialog.setDefaultCloseOperation(JFrame.HIDE_ON_CLOSE);
+			}
+			catch (Exception e)
+			{
+				log(e);
+			}
+		}
+
+		if (aboutDialog != null)
+			aboutDialog.setVisible(true);
 	}
 
 	private void clearScriptArea()
@@ -327,5 +372,80 @@ public class MainFrame extends JFrame implements SettingsDialogInvoker
 	public void reloadSettings()
 	{
 
+	}
+
+	@Override
+	public void addData(List<String> chunks)
+	{
+		for (String line : chunks)
+			scriptLines.add(line);
+	}
+
+	@Override
+	public void clearData()
+	{
+		if (scriptLines == null)
+			scriptLines = new LinkedList<>();
+		scriptLines.clear();
+
+		clearScriptArea();
+	}
+
+	@Override
+	public void presentData()
+	{
+		for (String line : scriptLines)
+			scriptArea.append(line + newLineChar);
+	}
+
+	private void doForWorkerEvent(SwingWorker worker, PropertyChangeEvent event)
+	{
+		if ("state".equals(event.getPropertyName()))
+		{
+			Object newValue = event.getNewValue();
+
+			if (newValue instanceof SwingWorker.StateValue)
+			{
+				SwingWorker.StateValue stateValue = (SwingWorker.StateValue) newValue;
+
+				switch (stateValue)
+				{
+					case STARTED:
+						doForWorkerStarted(worker);
+						break;
+					case DONE:
+						doForWorkerDone(worker);
+				}
+			}
+		}
+	}
+
+	private void doForWorkerStarted(SwingWorker worker)
+	{
+		ApplicationState desirableState = null;
+
+		switch (worker.getClass().getSimpleName())
+		{
+			case RunnerConstants.CLASS_NAME_SCRIPTLOADER:
+				clearData();
+				desirableState = ApplicationState.SCRIPT_LOADING;
+		}
+
+		if (desirableState != null)
+			setApplicationState(desirableState);
+	}
+
+	private void doForWorkerDone(SwingWorker worker)
+	{
+		ApplicationState desirableState = ApplicationState.READY;
+
+		switch (worker.getClass().getSimpleName())
+		{
+			case RunnerConstants.CLASS_NAME_SCRIPTLOADER:
+				if ( !worker.isCancelled() )
+					desirableState = ApplicationState.SCRIPT_LOADED;
+		}
+
+		setApplicationState(desirableState);
 	}
 }

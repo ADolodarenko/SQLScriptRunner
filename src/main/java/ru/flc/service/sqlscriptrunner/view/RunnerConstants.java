@@ -2,6 +2,8 @@ package ru.flc.service.sqlscriptrunner.view;
 
 public class RunnerConstants
 {
+	public static final String CLASS_NAME_SCRIPTLOADER = "ScriptLoader";
+
 	public static final String KEY_ACTION_OPEN_SCRIPT = "ActionOpenScript";
 	public static final String KEY_ACTION_OPEN_SCRIPT_DESCR = "ActionOpenScriptDescript";
 	public static final String KEY_ACTION_RUN_SCRIPT = "ActionRunScript";
@@ -17,6 +19,7 @@ public class RunnerConstants
 	public static final String MESS_CONFIG_FILE_NAME = "sqlrunner.conf";
 	public static final String MESS_RESOURCE_BUNDLE_NAME = "SQLScriptRunner";
 
+	public static final String ICON_NAME_ABOUT = "hedgehogs.png";
 	public static final String ICON_NAME_MAIN = "fire.png";
 	public static final String ICON_NAME_OPEN = "open.png";
 	public static final String ICON_NAME_RUN = "run.png";
