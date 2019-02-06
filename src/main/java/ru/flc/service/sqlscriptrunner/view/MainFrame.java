@@ -1,9 +1,12 @@
 package ru.flc.service.sqlscriptrunner.view;
 
 import org.dav.service.settings.DatabaseSettings;
+import org.dav.service.settings.Settings;
 import org.dav.service.settings.TransmissiveSettings;
 import org.dav.service.settings.ViewSettings;
+import org.dav.service.util.Constants;
 import org.dav.service.util.ResourceManager;
+import org.dav.service.view.ExtensionInfoType;
 import org.dav.service.view.Title;
 import org.dav.service.view.TitleAdjuster;
 import org.dav.service.view.ViewUtils;
@@ -16,7 +19,7 @@ import ru.flc.service.sqlscriptrunner.model.logic.ScriptLoader;
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.*;
-import java.awt.event.ActionEvent;
+import java.awt.event.*;
 import java.beans.PropertyChangeEvent;
 import java.io.File;
 import java.util.LinkedList;
@@ -62,7 +65,8 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 		ViewUtils.resetResourceManager(resourceManager);
 
 		loadAllSettings();
-		loadComponents();
+		initComponents();
+		initFrame();
 
 		setApplicationState(ApplicationState.READY);
 	}
@@ -99,16 +103,29 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 		}
 	}
 
-	private void loadComponents()
+	private void initComponents()
 	{
+		resourceManager.setCurrentLocale(viewSettings.getAppLocale());
 		titleAdjuster = new TitleAdjuster();
+		ViewUtils.setDialogOwner(this);
+		ViewUtils.adjustDialogs();
 
 		initActions();
 		initToolBar();
 		initScriptArea();
 		initLogTable();
 		initSplitter();
-		initFrame();
+
+		String assemblyInfo = ViewUtils.getAssemblyInformationString(this, " - ",
+				new ExtensionInfoType[]{ExtensionInfoType.IMPLEMENTATION_TITLE,
+						ExtensionInfoType.IMPLEMENTATION_VERSION});
+
+		titleAdjuster.registerComponent(this, new Title(resourceManager,
+				Constants.KEY_MAIN_FRAME,
+				assemblyInfo,
+				""));
+
+		titleAdjuster.resetComponents();
 
 		pack();
 	}
@@ -116,13 +133,63 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	private void initFrame()
 	{
 		setIconImage(resourceManager.getImageIcon(RunnerConstants.ICON_NAME_MAIN).getImage());
-		setPreferredSize(MAIN_WIN_MIN_SIZE);
+
 		setMinimumSize(MAIN_WIN_MIN_SIZE);
+		setPreferredSize(MAIN_WIN_MIN_SIZE);
+
+		setResizingPolicy();
+		setBoundsFromSettings();
+		setClosingPolicy();
+	}
+
+	private void setResizingPolicy()
+	{
+		addComponentListener(new ComponentAdapter()
+		{
+			@Override
+			public void componentResized(ComponentEvent e)
+			{
+				Dimension currentDim = MainFrame.this.getSize();
+				Dimension minimumDim = MainFrame.this.getMinimumSize();
+
+				if (currentDim.width < minimumDim.width)
+					currentDim.width = minimumDim.width;
+				if (currentDim.height < minimumDim.height)
+					currentDim.height = minimumDim.height;
+
+				MainFrame.this.setSize(currentDim);
+			}
+		});
+	}
+
+	private void setBoundsFromSettings()
+	{
+		if (viewSettings.isMainWindowMaximized())
+			setExtendedState(getExtendedState() | JFrame.MAXIMIZED_BOTH);
+		else
+			setBounds(viewSettings.getMainWindowPosition().x,
+					viewSettings.getMainWindowPosition().y,
+					viewSettings.getMainWindowSize().width,
+					viewSettings.getMainWindowSize().height);
+	}
+
+	private void setClosingPolicy()
+	{
+		addWindowListener(new WindowAdapter()
+		{
+			@Override
+			public void windowClosing(WindowEvent e)
+			{
+				//cancelProcesses();
+				updateViewSettings();
+			}
+		});
 	}
 
 	private void initActions()
 	{
-		openFileAction = new AbstractAction() {
+		openFileAction = new AbstractAction()
+		{
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
@@ -130,7 +197,8 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 			}
 		};
 
-		runAction = new AbstractAction() {
+		runAction = new AbstractAction()
+		{
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
@@ -139,7 +207,8 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 			}
 		};
 
-		closeAction = new AbstractAction() {
+		closeAction = new AbstractAction()
+		{
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
@@ -147,7 +216,8 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 			}
 		};
 
-		settingsAction = new AbstractAction() {
+		settingsAction = new AbstractAction()
+		{
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
@@ -155,7 +225,8 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 			}
 		};
 
-		helpAction = new AbstractAction() {
+		helpAction = new AbstractAction()
+		{
 			@Override
 			public void actionPerformed(ActionEvent e)
 			{
@@ -202,6 +273,27 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 		action.putValue(Action.NAME, actionName);
 		action.putValue(Action.SHORT_DESCRIPTION, actionShortDescription);
 		action.putValue(Action.SMALL_ICON, resourceManager.getImageIcon(actionIconName));
+	}
+
+	private void updateViewSettings()
+	{
+		viewSettings.setMainWindowMaximized(getExtendedState() == JFrame.MAXIMIZED_BOTH);
+		viewSettings.setMainWindowPosition(getBounds().getLocation());
+		viewSettings.setMainWindowSize(getSize());
+
+		updateSpecificSettings(viewSettings);
+	}
+
+	private void updateSpecificSettings(Settings settings)
+	{
+		try
+		{
+			settings.save();
+		}
+		catch (Exception e)
+		{
+			log(e);
+		}
 	}
 
 	private void initToolBar()
@@ -339,7 +431,7 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	{
 		if (settingsDialog == null)
 		{
-			TransmissiveSettings[] settingsArray = new TransmissiveSettings[]{dbSettings};
+			TransmissiveSettings[] settingsArray = new TransmissiveSettings[]{dbSettings, viewSettings};
 
 			try
 			{
@@ -371,7 +463,26 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	@Override
 	public void reloadSettings()
 	{
+		reloadViewSettings();
+	}
 
+	private void reloadViewSettings()
+	{
+		if (viewSettings != null)
+		{
+			resourceManager.setCurrentLocale(viewSettings.getAppLocale());
+
+			repaintFrame();
+
+			ViewUtils.adjustDialogs();
+		}
+	}
+
+	private void repaintFrame()
+	{
+		titleAdjuster.resetComponents();
+
+		validate();
 	}
 
 	@Override
