@@ -14,6 +14,7 @@ public class RunnerConstants
 	public static final String KEY_ACTION_SHOW_SETTINGS_DESCR = "ActionShowSettingsDescript";
 	public static final String KEY_ACTION_HELP = "ActionHelp";
 	public static final String KEY_ACTION_HELP_DESCR = "ActionHelpDescript";
+	public static final String KEY_PARAM_SCRIPT_FILE_PATH = "ScriptFilePath";
 
 	public static final String MESS_LOGGING_PROPERTIES_FILE_NAME = "sqlrunner_logging.conf";
 	public static final String MESS_CONFIG_FILE_NAME = "sqlrunner.conf";

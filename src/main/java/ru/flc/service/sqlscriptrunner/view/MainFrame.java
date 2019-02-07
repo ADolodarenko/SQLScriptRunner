@@ -15,6 +15,7 @@ import org.dav.service.view.dialog.SettingsDialogInvoker;
 import ru.flc.service.sqlscriptrunner.RunnerResourceManager;
 import ru.flc.service.sqlscriptrunner.model.ApplicationState;
 import ru.flc.service.sqlscriptrunner.model.logic.ScriptLoader;
+import ru.flc.service.sqlscriptrunner.model.settings.OperationalSettings;
 
 import javax.swing.*;
 import javax.swing.filechooser.FileNameExtensionFilter;
@@ -50,6 +51,7 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 
 	private DatabaseSettings dbSettings;
 	private ViewSettings viewSettings;
+	private OperationalSettings operationalSettings;
 
 	private SettingsDialog settingsDialog;
 	private AboutDialog aboutDialog;
@@ -75,6 +77,7 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	{
 		loadDatabaseSettings();
 		loadViewSettings();
+		loadOperationalSettings();
 	}
 
 	private void loadDatabaseSettings()
@@ -96,6 +99,19 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 		{
 			viewSettings = new ViewSettings(resourceManager, MAIN_WIN_PREF_SIZE);
 			viewSettings.load();
+		}
+		catch (Exception e)
+		{
+			log(e);
+		}
+	}
+
+	public void loadOperationalSettings()
+	{
+		try
+		{
+			operationalSettings = new OperationalSettings(resourceManager);
+			operationalSettings.load();
 		}
 		catch (Exception e)
 		{
@@ -182,6 +198,7 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 			{
 				//cancelProcesses();
 				updateViewSettings();
+				updateSpecificSettings(operationalSettings);
 			}
 		});
 	}
@@ -349,16 +366,29 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	{
 		if (checkApplicationStates(ApplicationState.READY, ApplicationState.SCRIPT_LOADED))
 		{
-			JFileChooser fileChooser = ViewUtils.getFileChooser(new File("."));
+			JFileChooser fileChooser = ViewUtils.getFileChooser(operationalSettings.getScriptFilePath());
 			fileChooser.resetChoosableFileFilters();
 			fileChooser.addChoosableFileFilter(new FileNameExtensionFilter("SQL", "SQL"));
 
-			if (fileChooser.showOpenDialog(ViewUtils.getDialogOwner()) == JFileChooser.APPROVE_OPTION)
+			int fileChooserResult = fileChooser.showOpenDialog(ViewUtils.getDialogOwner());
+
+			if (fileChooserResult == JFileChooser.APPROVE_OPTION)
 			{
-				scriptLoader = new ScriptLoader(fileChooser.getSelectedFile(), this);
-				scriptLoader.getPropertyChangeSupport().addPropertyChangeListener("state",
-						evt -> doForWorkerEvent(scriptLoader, evt));
-				scriptLoader.execute();
+				closeScript();
+
+				File selectedFile = fileChooser.getSelectedFile();
+
+				if (selectedFile.exists())
+				{
+					File currentDirectory = fileChooser.getCurrentDirectory();
+					operationalSettings.setScriptFilePath(currentDirectory);
+
+					scriptLoader = new ScriptLoader(fileChooser.getSelectedFile(),
+							operationalSettings.getScriptCharset(), this);
+					scriptLoader.getPropertyChangeSupport().addPropertyChangeListener("state",
+							evt -> doForWorkerEvent(scriptLoader, evt));
+					scriptLoader.execute();
+				}
 			}
 		}
 	}
@@ -375,7 +405,7 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 
 	private void closeScript()
 	{
-		if (checkApplicationStates(ApplicationState.SCRIPT_LOADING, ApplicationState.SCRIPT_LOADED))
+		if (checkApplicationStates(ApplicationState.SCRIPT_LOADED))
 		{
 			clearData();
 			clearLogTable();
@@ -416,6 +446,21 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	private void setApplicationState(ApplicationState desirableState)
 	{
 		currentState = desirableState;
+
+		resetControlsStates();
+	}
+
+	private void resetControlsStates()
+	{
+		boolean canOpen = checkApplicationStates(ApplicationState.READY, ApplicationState.SCRIPT_LOADED);
+		openFileAction.setEnabled(canOpen);
+		settingsAction.setEnabled(canOpen);
+
+		boolean canRun = checkApplicationStates(ApplicationState.SCRIPT_LOADED);
+		runAction.setEnabled(canRun);
+
+		boolean canClose = checkApplicationStates(ApplicationState.SCRIPT_LOADED);
+		closeAction.setEnabled(canClose);
 	}
 
 	private boolean checkApplicationStates(ApplicationState... desirableStates)
@@ -431,7 +476,7 @@ public class MainFrame extends JFrame implements ResultView, SettingsDialogInvok
 	{
 		if (settingsDialog == null)
 		{
-			TransmissiveSettings[] settingsArray = new TransmissiveSettings[]{dbSettings, viewSettings};
+			TransmissiveSettings[] settingsArray = new TransmissiveSettings[]{dbSettings, viewSettings, operationalSettings};
 
 			try
 			{

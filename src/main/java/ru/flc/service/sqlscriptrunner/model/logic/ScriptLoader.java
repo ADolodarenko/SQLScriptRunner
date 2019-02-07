@@ -11,18 +11,24 @@ import java.util.concurrent.ExecutionException;
 public class ScriptLoader extends SwingWorker<Void, String>
 {
 	private File scriptFile;
+	private Charset fileCharset;
 	private ResultView view;
 
-	public ScriptLoader(File scriptFile, ResultView view)
+	public ScriptLoader(File scriptFile, Charset fileCharset, ResultView view)
 	{
 		this.scriptFile = scriptFile;
 		this.view = view;
+
+		if (fileCharset != null)
+			this.fileCharset = fileCharset;
+		else
+			this.fileCharset = Charset.defaultCharset();
 	}
 
 	@Override
 	protected Void doInBackground() throws Exception
 	{
-		BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(scriptFile), Charset.forName("CP1251")));
+		BufferedReader reader = new BufferedReader(new InputStreamReader(new FileInputStream(scriptFile), fileCharset));
 		String line;
 
 		while (!isCancelled() && (line = reader.readLine()) != null)
